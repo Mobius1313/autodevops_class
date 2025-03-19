@@ -59,28 +59,16 @@ git push origin main
 
 echo "GitHub updates pushed successfully!"
 
-# Get the absolute path of the build.sh script
-BUILD_SCRIPT="$(. build.sh)"
-
-# Define the CRON job
-CRON_JOB="*/10 * * * * /bin/bash $BUILD_SCRIPT >> /var/log/build_script.log 2>&1"
+## Setup CRON Job to run build.sh every 10 minutes
+CRON_JOB="*/10 * * * * /bin/bash $ . $0 >> /var/log/build_script.log 2>&1"
 
 # Check if the CRON job already exists
 crontab -l | grep -qF "$CRON_JOB"
 
 if [[ $? -ne 0 ]]; then
-    echo "Setting up CRON job to run build.sh every 10 minutes..."
-    
-    # Add the CRON job
+    echo "Setting up CRON job to run this script every 10 minutes..."
     (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
-    
     echo "CRON job added successfully!"
 else
     echo "CRON job already exists. No changes made."
-fi
-
-# Verify and display current CRON jobs
-echo "Current CRON jobs:"
-crontab -l
-
 fi
