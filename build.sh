@@ -2,7 +2,7 @@
 
 source .env
 
-echo "DockerHub Username: $DOCKERHUB_USERNAME"
+echo $DOCKERHUB_USERNAME
 
 DockerfileName="$DOCKERFILENAME"
 
@@ -24,13 +24,18 @@ fi
 echo "COPY . /usr/share/nginx/html" >> $DockerfileName
 echo "WORKDIR /usr/share/nginx/html" >> $DockerfileName
 
-## Build Docker image
 sudo docker build -t $APP_NAME:$BUILD_VERSION .
 
-## Push the image to Docker Hub
-echo "Pushing the image to Docker Hub..."
-sudo docker tag $APP_NAME:$BUILD_VERSION $DOCKERHUB_USERNAME/$APP_NAME:$BUILD_VERSION
-sudo docker push $DOCKERHUB_USERNAME/$APP_NAME:$BUILD_VERSION
+## Push to Docker Hub
+DOCKERHUB_REPO="$DOCKERHUB_USERNAME/$APP_NAME"
+sudo docker tag $APP_NAME:$BUILD_VERSION $DOCKERHUB_REPO:$BUILD_VERSION
+echo "Pushing image to Docker Hub..."
+echo "$DOCKERHUB_PASSWORD" | sudo docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+sudo docker push $DOCKERHUB_REPO:$BUILD_VERSION
+
+## Run Docker Scout Analysis
+echo "Running Docker Scout Analysis..."
+sudo docker scout quickview $DOCKERHUB_REPO:$BUILD_VERSION
 
 ## Remove previously running Docker container
 echo "Stopping any previously running container ... Please wait..."
@@ -41,35 +46,29 @@ echo "Running basic cleanups ..."
 sleep 2
 sudo docker rm $APP_NAME
 
-## Run the container
 echo "Running your container ... ---------------------------"
-sudo docker run -d -p $APP_PORT:80 --name $APP_NAME $DOCKERHUB_USERNAME/$APP_NAME:$BUILD_VERSION 
+sudo docker run -d -p $APP_PORT:80 --name $APP_NAME $APP_NAME:$BUILD_VERSION 
 
 echo "Application deployed successfully!"
 
-## Push the image to Docker Hub
-echo "Tagging and pushing image to Docker Hub..."
-sudo docker tag $APP_NAME:$BUILD_VERSION $DOCKERHUB_USERNAME/$APP_NAME:$BUILD_VERSION
-sudo docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
-sudo docker push $DOCKERHUB_USERNAME/$APP_NAME:$BUILD_VERSION
-
-## Analyze the image using Docker Scout
-echo "Analyzing the image with Docker Scout..."
-docker scout quickview $DOCKERHUB_USERNAME/$APP_NAME:$BUILD_VERSION
-
-## Setup cron job to run this script every 10 minutes
-echo "Configuring cron job..."
-CRON_JOB="*/10 * * * * $(whoami) /bin/bash $(pwd)/build.sh >> $(pwd)/cron.log 2>&1"
-
-# Check if cron job already exists
-(crontab -l 2>/dev/null | grep -v -F "$CRON_JOB"; echo "$CRON_JOB") | crontab -
-
-echo "Cron job configured successfully!"
-
-## Auto-push updates to GitHub every 10 minutes
+## Push updates to GitHub
 echo "Pushing updates to GitHub..."
 git add .
-git commit -m "Automated commit: $(now)"
+git commit -m "Automated update: $(now)"
 git push origin main
 
 echo "GitHub updates pushed successfully!"
+
+## Setup CRON Job to run build.sh every 10 minutes
+CRON_JOB="*/10 * * * * /bin/bash $ . $0 >> /var/log/build_script.log 2>&1"
+
+# Check if the CRON job already exists
+crontab -l | grep -qF "$CRON_JOB"
+
+if [[ $? -ne 0 ]]; then
+    echo "Setting up CRON job to run this script every 10 minutes..."
+    (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+    echo "CRON job added successfully!"
+else
+    echo "CRON job already exists. No changes made."
+fi
