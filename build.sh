@@ -54,8 +54,8 @@ echo "Application deployed successfully!"
 ## Push updates to GitHub
 echo "Pushing updates to GitHub..."
 git add .
-git commit -m "Automated update: $(10)"
-git push origin master
+git commit -m "Automated update: $(now)"
+git push origin main
 
 echo "GitHub updates pushed successfully!"
 
